@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { formatMoney, formatDateDisplay } from '../utils/format'
-import { formatDate, isWorkingDay, getWorkingDayForMonth } from '../utils/calendar'
+import { formatDate, isWorkingDay, getWorkingDayForMonth, getNextInvestDate, getInvestDatesInMonth, getDailyInvestDatesInMonth } from '../utils/calendar'
+import type { FrequencyType } from '../types'
 import Modal from '../components/Modal'
 import Calendar from '../components/Calendar'
+
+const WEEKDAYS = ['', '周一', '周二', '周三', '周四', '周五']
 
 export default function FundPlans() {
   const { fundPlans, accounts, transactions, addFundPlan, updateFundPlan, deleteFundPlan } = useStore()
@@ -17,6 +20,7 @@ export default function FundPlans() {
     fundCode: '',
     amount: '',
     accountId: accounts[0]?.id || '',
+    frequency: 'monthly' as FrequencyType,
     investmentDay: 15,
     useWorkingDay: true,
     status: 'active' as 'active' | 'paused',
@@ -29,6 +33,7 @@ export default function FundPlans() {
       fundCode: '',
       amount: '',
       accountId: accounts[0]?.id || '',
+      frequency: 'monthly',
       investmentDay: 15,
       useWorkingDay: true,
       status: 'active',
@@ -45,6 +50,7 @@ export default function FundPlans() {
       fundCode: plan.fundCode,
       amount: String(plan.amount),
       accountId: plan.accountId,
+      frequency: plan.frequency,
       investmentDay: plan.investmentDay,
       useWorkingDay: plan.useWorkingDay,
       status: plan.status,
@@ -59,8 +65,9 @@ export default function FundPlans() {
       fundCode: form.fundCode.trim(),
       amount: parseFloat(form.amount),
       accountId: form.accountId,
-      investmentDay: form.investmentDay,
-      useWorkingDay: form.useWorkingDay,
+      frequency: form.frequency,
+      investmentDay: form.frequency === 'daily' ? 0 : form.investmentDay,
+      useWorkingDay: form.frequency === 'daily' ? true : form.useWorkingDay,
       status: form.status,
     }
     if (editId) {
@@ -80,38 +87,39 @@ export default function FundPlans() {
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name || '未知'
 
-  // 获取某定投计划本月的实际扣款日
-  const getActualInvestDate = (plan: typeof fundPlans[0]) => {
-    const now = new Date()
-    if (plan.useWorkingDay) {
-      return getWorkingDayForMonth(now.getFullYear(), now.getMonth(), plan.investmentDay)
-    }
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-    const day = Math.min(plan.investmentDay, daysInMonth)
-    return formatDate(new Date(now.getFullYear(), now.getMonth(), day))
-  }
-
   // 获取定投相关的交易记录
   const getPlanTransactions = (planId: string) => {
     return transactions.filter((t) => t.category === '基金定投' && t.note?.includes(planId))
   }
 
-  // 计算下个月实际扣款日
-  const getNextInvestDate = (plan: typeof fundPlans[0]) => {
-    const now = new Date()
-    let year = now.getFullYear()
-    let month = now.getMonth() + 1
-    if (month > 11) {
-      month = 0
-      year++
-    }
-    if (plan.useWorkingDay) {
-      return getWorkingDayForMonth(year, month, plan.investmentDay)
-    }
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const day = Math.min(plan.investmentDay, daysInMonth)
-    return formatDate(new Date(year, month, day))
+  // 频率显示文字
+  const getFrequencyText = (plan: typeof fundPlans[0]) => {
+    if (plan.frequency === 'daily') return '每个工作日'
+    if (plan.frequency === 'weekly') return `每${WEEKDAYS[plan.investmentDay] || ''}`
+    return `每月${plan.investmentDay}日`
   }
+
+  // 频率图标
+  const getFrequencyIcon = (freq: FrequencyType) => {
+    if (freq === 'daily') return '⚡'
+    if (freq === 'weekly') return '📅'
+    return '📆'
+  }
+
+  // 计算本月扣款次数和总额
+  const getMonthlyStats = (plan: typeof fundPlans[0]) => {
+    const now = new Date()
+    const dates = getInvestDatesInMonth(plan, now.getFullYear(), now.getMonth())
+    return { count: dates.length, total: dates.length * plan.amount }
+  }
+
+  // 统计所有活跃定投的月度总额
+  const totalMonthlyAmount = fundPlans
+    .filter((p) => p.status === 'active')
+    .reduce((sum, p) => {
+      const stats = getMonthlyStats(p)
+      return sum + stats.total
+    }, 0)
 
   return (
     <div className="page-transition safe-top min-h-screen">
@@ -121,13 +129,11 @@ export default function FundPlans() {
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white/15 backdrop-blur-sm rounded-xl px-3 py-2.5">
             <p className="text-white/70 text-xs">活跃定投</p>
-            <p className="text-white text-xl font-bold">{fundPlans.filter(p => p.status === 'active').length}</p>
+            <p className="text-white text-xl font-bold">{fundPlans.filter((p) => p.status === 'active').length}</p>
           </div>
           <div className="bg-white/15 backdrop-blur-sm rounded-xl px-3 py-2.5">
-            <p className="text-white/70 text-xs">每月定投额</p>
-            <p className="text-white text-xl font-bold">
-              ¥{formatMoney(fundPlans.filter(p => p.status === 'active').reduce((sum, p) => sum + p.amount, 0))}
-            </p>
+            <p className="text-white/70 text-xs">月度定投额</p>
+            <p className="text-white text-xl font-bold">¥{formatMoney(totalMonthlyAmount)}</p>
           </div>
         </div>
       </div>
@@ -138,7 +144,7 @@ export default function FundPlans() {
           <div className="py-16 text-center">
             <p className="text-5xl mb-3">📈</p>
             <p className="text-gray-400 text-sm mb-1">还没有定投计划</p>
-            <p className="text-gray-300 text-xs">创建定投计划，自动结合工作日</p>
+            <p className="text-gray-300 text-xs">支持每天/每周/每月定投，工作日智能扣费</p>
           </div>
         ) : (
           fundPlans.map((plan) => {
@@ -146,6 +152,7 @@ export default function FundPlans() {
             const isWorkingDayNext = isWorkingDay(nextDate)
             const planTxns = getPlanTransactions(plan.id)
             const totalInvested = planTxns.reduce((sum, t) => sum + t.amount, 0)
+            const monthlyStats = getMonthlyStats(plan)
 
             return (
               <div
@@ -171,11 +178,14 @@ export default function FundPlans() {
                   <span className="text-base font-semibold text-teal-600">¥{formatMoney(plan.amount)}</span>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-3 text-xs flex-wrap">
                   <div className="flex items-center gap-1 text-gray-500">
-                    <span>📅</span>
-                    <span>每月{plan.investmentDay}日</span>
-                    {plan.useWorkingDay && (
+                    <span>{getFrequencyIcon(plan.frequency)}</span>
+                    <span>{getFrequencyText(plan)}</span>
+                    {plan.frequency === 'daily' && (
+                      <span className="text-orange-400">（工作日扣费）</span>
+                    )}
+                    {plan.frequency !== 'daily' && plan.useWorkingDay && (
                       <span className="text-orange-400">（工作日）</span>
                     )}
                   </div>
@@ -190,14 +200,16 @@ export default function FundPlans() {
                   <div className="flex items-center gap-1">
                     <span className="text-gray-400">下次扣款</span>
                     <span className="text-gray-700 font-medium">{formatDateDisplay(nextDate)}</span>
-                    {plan.useWorkingDay && !isWorkingDayNext && (
+                    {plan.frequency !== 'daily' && plan.useWorkingDay && !isWorkingDayNext && (
                       <span className="text-red-400">（已顺延）</span>
                     )}
-                    {plan.useWorkingDay && isWorkingDayNext && (
+                    {isWorkingDayNext && (
                       <span className="text-green-400">（工作日）</span>
                     )}
                   </div>
-                  <span className="text-gray-400">累计投入 ¥{formatMoney(totalInvested)}</span>
+                  <span className="text-gray-400">
+                    本月{monthlyStats.count}次 · 累计¥{formatMoney(totalInvested)}
+                  </span>
                 </div>
               </div>
             )
@@ -248,7 +260,7 @@ export default function FundPlans() {
 
           {/* Amount */}
           <div>
-            <label className="text-xs text-gray-500 mb-1.5 block">定投金额</label>
+            <label className="text-xs text-gray-500 mb-1.5 block">定投金额（每次）</label>
             <input
               type="number"
               value={form.amount}
@@ -277,58 +289,135 @@ export default function FundPlans() {
             </div>
           </div>
 
-          {/* Investment day */}
+          {/* Frequency selector */}
           <div>
-            <label className="text-xs text-gray-500 mb-1.5 block">定投日期（每月几号）</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={31}
-                value={form.investmentDay}
-                onChange={(e) => setForm({ ...form, investmentDay: Math.min(31, Math.max(1, parseInt(e.target.value) || 1)) })}
-                className="w-20 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-100 text-sm text-center focus:outline-none focus:border-primary-400"
-              />
-              <span className="text-sm text-gray-400">日</span>
+            <label className="text-xs text-gray-500 mb-1.5 block">定投频率</label>
+            <div className="flex gap-2">
+              {([
+                { value: 'daily', label: '每天', icon: '⚡' },
+                { value: 'weekly', label: '每周', icon: '📅' },
+                { value: 'monthly', label: '每月', icon: '📆' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setForm({
+                    ...form,
+                    frequency: opt.value,
+                    investmentDay: opt.value === 'weekly' ? 1 : opt.value === 'monthly' ? 15 : 0,
+                    useWorkingDay: opt.value === 'daily' ? true : form.useWorkingDay,
+                  })}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border-2 transition-all ${
+                    form.frequency === opt.value ? 'border-primary-500 bg-primary-50' : 'border-gray-100'
+                  }`}
+                >
+                  <span className="text-lg">{opt.icon}</span>
+                  <span className={`text-xs ${form.frequency === opt.value ? 'text-primary-600 font-medium' : 'text-gray-500'}`}>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Daily frequency info */}
+          {form.frequency === 'daily' && (
+            <div className="bg-orange-50 rounded-lg px-3 py-3">
+              <div className="flex items-start gap-2">
+                <span className="text-orange-500 text-sm">💡</span>
+                <div>
+                  <p className="text-xs text-orange-700 font-medium">每天定投 = 每个工作日扣费</p>
+                  <p className="text-[10px] text-orange-500 mt-0.5">
+                    系统将自动在日历中的每个工作日进行扣费，节假日和周末不扣费。
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Weekly day selector */}
+          {form.frequency === 'weekly' && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">扣款日（周几）</label>
+              <div className="flex gap-1.5">
+                {[1, 2, 3, 4, 5].map((day) => (
+                  <button
+                    key={day}
+                    onClick={() => setForm({ ...form, investmentDay: day })}
+                    className={`flex-1 py-2 rounded-lg border-2 text-xs transition-all ${
+                      form.investmentDay === day ? 'border-primary-500 bg-primary-50 text-primary-600 font-medium' : 'border-gray-100 text-gray-500'
+                    }`}
+                  >
+                    {WEEKDAYS[day]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Monthly day selector */}
+          {form.frequency === 'monthly' && (
+            <div>
+              <label className="text-xs text-gray-500 mb-1.5 block">定投日期（每月几号）</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={form.investmentDay}
+                  onChange={(e) => setForm({ ...form, investmentDay: Math.min(31, Math.max(1, parseInt(e.target.value) || 1)) })}
+                  className="w-20 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-100 text-sm text-center focus:outline-none focus:border-primary-400"
+                />
+                <span className="text-sm text-gray-400">日</span>
+              </div>
+            </div>
+          )}
+
+          {/* Working day toggle (only for weekly and monthly) */}
+          {form.frequency !== 'daily' && (
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-3">
+              <div>
+                <p className="text-sm text-gray-700 font-medium">工作日定投</p>
+                <p className="text-xs text-gray-400 mt-0.5">非工作日自动顺延至下一个工作日</p>
+              </div>
               <button
-                onClick={() => setCalendarOpen(true)}
-                className="ml-auto flex items-center gap-1 px-3 py-2 rounded-lg bg-orange-50 text-orange-500 text-xs active:scale-95 transition-transform"
+                onClick={() => setForm({ ...form, useWorkingDay: !form.useWorkingDay })}
+                className={`relative w-11 h-6 rounded-full transition-colors ${form.useWorkingDay ? 'bg-primary-500' : 'bg-gray-300'}`}
               >
-                <span>📅</span>
-                查看工作日
+                <div
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                    form.useWorkingDay ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
               </button>
             </div>
-          </div>
-
-          {/* Working day toggle */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-3">
-            <div>
-              <p className="text-sm text-gray-700 font-medium">工作日定投</p>
-              <p className="text-xs text-gray-400 mt-0.5">非工作日自动顺延至下一个工作日</p>
-            </div>
-            <button
-              onClick={() => setForm({ ...form, useWorkingDay: !form.useWorkingDay })}
-              className={`relative w-11 h-6 rounded-full transition-colors ${form.useWorkingDay ? 'bg-primary-500' : 'bg-gray-300'}`}
-            >
-              <div
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                  form.useWorkingDay ? 'translate-x-5' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
+          )}
 
           {/* Preview */}
-          {form.useWorkingDay && form.investmentDay && (
+          {form.frequency === 'monthly' && form.useWorkingDay && form.investmentDay && (
             <div className="bg-teal-50 rounded-lg px-3 py-2.5">
               <p className="text-xs text-teal-600">
-                💡 本月{form.investmentDay}日定投日实际扣款日：
+                💡 本月{form.investmentDay}日实际扣款日：
                 <span className="font-semibold">
                   {getWorkingDayForMonth(new Date().getFullYear(), new Date().getMonth(), form.investmentDay)}
                 </span>
               </p>
             </div>
           )}
+
+          {form.frequency === 'weekly' && form.useWorkingDay && (
+            <div className="bg-teal-50 rounded-lg px-3 py-2.5">
+              <p className="text-xs text-teal-600">
+                💡 每{WEEKDAYS[form.investmentDay]}定投，非工作日自动顺延
+              </p>
+            </div>
+          )}
+
+          {/* View calendar button */}
+          <button
+            onClick={() => setCalendarOpen(true)}
+            className="w-full flex items-center justify-center gap-1 py-2 rounded-lg bg-orange-50 text-orange-500 text-xs active:scale-95 transition-transform"
+          >
+            <span>📅</span>
+            查看工作日日历
+          </button>
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">
@@ -354,7 +443,9 @@ export default function FundPlans() {
       <Modal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} title="工作日日历">
         <div className="mb-3 bg-orange-50 rounded-lg px-3 py-2">
           <p className="text-xs text-orange-600">
-            📌 绿色为工作日（可定投），灰色为非工作日。定投日若为非工作日将自动顺延。
+            📌 绿色为工作日（可定投），灰色为非工作日。
+            {form.frequency === 'daily' && ' 每天定投模式将在所有绿色日期扣费。'}
+            {form.frequency !== 'daily' && ' 定投日若为非工作日将自动顺延。'}
           </p>
         </div>
         <Calendar
