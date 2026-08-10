@@ -42,6 +42,7 @@ export interface FundPlan {
   investmentDay: number // 每月几号(1-31) 或 每周几(1-5, 1=周一)；daily 模式下忽略此字段
   useWorkingDay: boolean // 非工作日顺延到下一个工作日（daily 模式强制为 true）
   status: 'active' | 'paused'
+  lastExecutedDate?: string // 最后一次执行扣费的日期 (YYYY-MM-DD)，防止同一天重复扣费
   createdAt: string
 }
 
