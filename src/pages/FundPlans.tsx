@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { formatMoney, formatDateDisplay } from '../utils/format'
-import { formatDate, isWorkingDay, getWorkingDayForMonth, getNextInvestDate, getInvestDatesInMonth, getDailyInvestDatesInMonth } from '../utils/calendar'
+import { formatDate, isWorkingDay, getWorkingDayForMonth, getNextInvestDate, getInvestDatesInMonth, getDailyInvestDatesInMonth, getToday } from '../utils/calendar'
 import type { FrequencyType } from '../types'
 import Modal from '../components/Modal'
 import Calendar from '../components/Calendar'
@@ -205,6 +205,9 @@ export default function FundPlans() {
                     )}
                     {isWorkingDayNext && (
                       <span className="text-green-400">（工作日）</span>
+                    )}
+                    {plan.lastExecutedDate === getToday() && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded bg-green-50 text-green-500 text-[10px] font-medium">今日已扣款</span>
                     )}
                   </div>
                   <span className="text-gray-400">
