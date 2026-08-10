@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Account, Transaction, FundPlan } from '../types'
 import { generateId } from '../utils/format'
+import { formatDate, getInvestDatesInMonth } from '../utils/calendar'
 
 interface StoreState {
   accounts: Account[]
@@ -21,6 +22,9 @@ interface StoreState {
   addFundPlan: (plan: Omit<FundPlan, 'id' | 'createdAt'>) => void
   updateFundPlan: (id: string, plan: Partial<FundPlan>) => void
   deleteFundPlan: (id: string) => void
+
+  // 自动执行到期定投
+  executeDueFundPlans: () => void
 }
 
 export const useStore = create<StoreState>()(
@@ -154,6 +158,53 @@ export const useStore = create<StoreState>()(
         set((state) => ({
           fundPlans: state.fundPlans.filter((p) => p.id !== id),
         })),
+
+      executeDueFundPlans: () =>
+        set((state) => {
+          const today = formatDate(new Date())
+          const now = new Date()
+          let accounts = state.accounts
+          let transactions = state.transactions
+          let hasChanges = false
+
+          const updatedPlans = state.fundPlans.map((plan) => {
+            // 跳过暂停的计划和今天已执行的
+            if (plan.status !== 'active') return plan
+            if (plan.lastExecutedDate === today) return plan
+
+            // 检查今天是否是该计划的扣款日
+            const investDates = getInvestDatesInMonth(
+              plan,
+              now.getFullYear(),
+              now.getMonth()
+            )
+            if (!investDates.includes(today)) return plan
+
+            // 执行扣费：创建支出交易并扣减账户余额
+            hasChanges = true
+            const newTransaction: Transaction = {
+              id: generateId(),
+              type: 'expense',
+              amount: plan.amount,
+              category: '基金定投',
+              accountId: plan.accountId,
+              note: `定投扣款 - ${plan.fundName} [${plan.id}]`,
+              date: today,
+              createdAt: new Date().toISOString(),
+            }
+            transactions = [newTransaction, ...transactions]
+            accounts = accounts.map((account) =>
+              account.id === plan.accountId
+                ? { ...account, balance: account.balance - plan.amount }
+                : account
+            )
+
+            return { ...plan, lastExecutedDate: today }
+          })
+
+          if (!hasChanges) return state
+          return { accounts, transactions, fundPlans: updatedPlans }
+        }),
     }),
     {
       name: 'expense-tracker-storage',
