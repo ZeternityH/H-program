@@ -73,14 +73,26 @@ export default function AddTransaction() {
       </div>
 
       <div className="px-4 pt-4">
-        {/* Amount display */}
+        {/* Amount input */}
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-50 mb-4">
           <p className="text-xs text-gray-400 mb-1">金额</p>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl text-gray-700">¥</span>
-            <span className={`text-4xl font-bold ${amount ? 'text-gray-800' : 'text-gray-300'}`}>
-              {amount || '0'}
-            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => {
+                let val = e.target.value.replace(/[^\d.]/g, '')
+                const parts = val.split('.')
+                if (parts.length > 2) return
+                if (parts[1] && parts[1].length > 2) return
+                setAmount(val)
+              }}
+              placeholder="0"
+              autoFocus
+              className="text-4xl font-bold bg-transparent focus:outline-none w-full text-gray-800 placeholder:text-gray-300"
+            />
           </div>
         </div>
 
