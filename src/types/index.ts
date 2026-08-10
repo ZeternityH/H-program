@@ -28,6 +28,9 @@ export interface Transaction {
   createdAt: string
 }
 
+// 定投频率
+export type FrequencyType = 'daily' | 'weekly' | 'monthly'
+
 // 基金定投计划
 export interface FundPlan {
   id: string
@@ -35,8 +38,9 @@ export interface FundPlan {
   fundCode: string
   amount: number
   accountId: string
-  investmentDay: number // 每月几号 (1-31)
-  useWorkingDay: boolean // 是否使用工作日定投（如果为true，遇到非工作日顺延到下一个工作日）
+  frequency: FrequencyType // 每天/每周/每月
+  investmentDay: number // 每月几号(1-31) 或 每周几(1-5, 1=周一)；daily 模式下忽略此字段
+  useWorkingDay: boolean // 非工作日顺延到下一个工作日（daily 模式强制为 true）
   status: 'active' | 'paused'
   createdAt: string
 }
