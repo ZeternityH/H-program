@@ -1,19 +1,956 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="日常记账" />
-  <meta name="theme-color" content="#10B981" />
-  <link rel="manifest" href="/H-program/manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="/H-program/icons/icon-192.png" />
-  <title>日常记账</title>
-  <script type="module" crossorigin src="/H-program/assets/index-B9KI7Tl3.js"></script>
-  <link rel="stylesheet" crossorigin href="/H-program/assets/index-DaHw7lfz.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>日常记账</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --text:#1f2937; --text2:#6b7280;
+    --border:#e5e7eb; --primary:#4f46e5; --primary-light:#eef2ff;
+    --expense:#ef4444; --income:#10b981; --warning:#f59e0b;
+    --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased;touch-action:manipulation}
+  .app{max-width:880px;margin:0 auto;padding:16px;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(80px,env(safe-area-inset-bottom))}
+  /* 顶部概览 */
+  .header{text-align:center;padding:20px 0 8px}
+  .header h1{font-size:22px;font-weight:700;letter-spacing:.5px}
+  .header .sub{font-size:13px;color:var(--text2);margin-top:4px}
+  .stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
+  .stat-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+  .stat-card .label{font-size:12px;color:var(--text2)}
+  .stat-card .value{font-size:22px;font-weight:700;margin-top:4px}
+  .stat-card.total{grid-column:span 2;background:linear-gradient(135deg,#4f46e5,#6366f1);color:#fff}
+  .stat-card.total .label{color:rgba(255,255,255,.8)}
+  .stat-card.total .value{font-size:28px}
+  .stat-card .value.expense{color:var(--expense)}
+  .stat-card .value.income{color:var(--income)}
+  /* Tab 导航 */
+  .tabs{display:flex;background:var(--card);border-radius:var(--radius);padding:5px;box-shadow:var(--shadow);margin-bottom:16px}
+  .tab{flex:1;text-align:center;padding:10px;font-size:14px;font-weight:500;color:var(--text2);border-radius:8px;cursor:pointer;transition:all .2s;border:none;background:none}
+  .tab.active{background:var(--primary);color:#fff}
+  /* 通用卡片 */
+  .section-title{font-size:15px;font-weight:600;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center}
+  .section-title .right{font-size:13px;font-weight:400;color:var(--text2)}
+  /* 账户卡片 */
+  .account-card{background:var(--card);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+  .account-card .left{display:flex;align-items:center;gap:12px}
+  .account-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--primary-light)}
+  .account-info .name{font-weight:600;font-size:15px}
+  .account-info .meta{font-size:12px;color:var(--text2);margin-top:2px}
+  .account-balance{font-weight:700;font-size:17px;text-align:right}
+  .account-balance .small{font-size:11px;color:var(--text2);font-weight:400}
+  .account-actions{display:flex;gap:6px;margin-top:8px}
+  .account-actions button{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer}
+  .account-actions button:hover{background:var(--bg)}
+  /* 表单 */
+  .form-card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:16px}
+  .form-row{margin-bottom:14px}
+  .form-row label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+  .form-row input,.form-row select,.form-row textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:#fff;color:var(--text);outline:none;transition:border .2s}
+  .form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--primary)}
+  .type-switch{display:flex;gap:8px;margin-bottom:16px}
+  .type-btn{flex:1;padding:12px;border-radius:8px;border:2px solid var(--border);background:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
+  .type-btn.active.expense{border-color:var(--expense);background:#fef2f2;color:var(--expense)}
+  .type-btn.active.income{border-color:var(--income);background:#f0fdf4;color:var(--income)}
+  .category-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .cat-item{text-align:center;padding:10px 4px;border-radius:8px;border:2px solid var(--border);background:#fff;cursor:pointer;font-size:12px;transition:all .15s}
+  .cat-item .ico{font-size:22px;display:block;margin-bottom:4px}
+  .cat-item.active{border-color:var(--primary);background:var(--primary-light)}
+  .btn{display:block;width:100%;padding:13px;border:none;border-radius:8px;background:var(--primary);color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s}
+  .btn:hover{opacity:.9}
+  .btn.secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+  .btn.danger{background:var(--expense)}
+  /* 记录列表 */
+  .filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .filter-bar select{padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:#fff;font-family:inherit}
+  .record-item{background:var(--card);border-radius:var(--radius);padding:12px 16px;box-shadow:var(--shadow);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .record-item .rc-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+  .rc-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .rc-icon.expense{background:#fef2f2}
+  .rc-icon.income{background:#f0fdf4}
+  .rc-info{min-width:0;flex:1}
+  .rc-info .top{display:flex;align-items:center;gap:6px}
+  .rc-info .cat{font-weight:600;font-size:14px}
+  .rc-info .acct{font-size:11px;color:var(--text2);background:var(--bg);padding:2px 6px;border-radius:4px}
+  .rc-info .note{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .rc-right{text-align:right;flex-shrink:0;margin-left:8px}
+  .rc-amount{font-weight:700;font-size:16px}
+  .rc-amount.expense{color:var(--expense)}
+  .rc-amount.income{color:var(--income)}
+  .rc-date{font-size:11px;color:var(--text2);margin-top:2px}
+  .rc-del{font-size:12px;color:var(--expense);background:none;border:none;cursor:pointer;margin-top:4px;display:none}
+  .record-item:hover .rc-del{display:block}
+  .empty{text-align:center;padding:40px;color:var(--text2);font-size:14px}
+  /* 统计 */
+  .chart-card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
+  .chart-card h3{font-size:14px;font-weight:600;margin-bottom:12px}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
+  .bar-row .bar-label{width:70px;text-align:right;flex-shrink:0}
+  .bar-track{flex:1;height:22px;background:var(--bg);border-radius:6px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;transition:width .5s;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;color:#fff;font-weight:600;min-width:30px}
+  .bar-amount{width:80px;flex-shrink:0;text-align:right;font-weight:600}
+  .month-trend{display:flex;align-items:flex-end;gap:6px;height:120px;padding:8px 0}
+  .month-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .month-bar{width:60%;border-radius:4px 4px 0 0;min-height:4px;position:relative}
+  .month-bar.expense{background:var(--expense)}
+  .month-bar.income{background:var(--income)}
+  .month-label{font-size:10px;color:var(--text2)}
+  /* 弹窗 */
+  .modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;padding:16px}
+  .modal-mask.show{display:flex}
+  .modal{background:#fff;border-radius:var(--radius);padding:20px;width:100%;max-width:380px;max-height:85vh;overflow-y:auto}
+  .modal h3{font-size:17px;font-weight:700;margin-bottom:16px;text-align:center}
+  .modal .btn{margin-top:6px}
+  /* 定投计划卡片 */
+  .plan-card{background:var(--card);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px}
+  .plan-card .plan-top{display:flex;align-items:center;justify-content:space-between}
+  .plan-card .plan-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+  .plan-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--primary-light)}
+  .plan-info .name{font-weight:600;font-size:15px}
+  .plan-info .meta{font-size:12px;color:var(--text2);margin-top:2px}
+  .plan-amount{font-weight:700;font-size:16px;text-align:right}
+  .plan-amount .small{font-size:11px;color:var(--text2);font-weight:400}
+  .plan-actions{display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap}
+  .plan-actions button{font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer}
+  .plan-actions button:hover{background:var(--bg)}
+  .plan-toggle{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)}
+  .plan-toggle .switch{width:36px;height:20px;border-radius:10px;background:#d1d5db;position:relative;cursor:pointer;transition:background .2s}
+  .plan-toggle .switch.on{background:var(--income)}
+  .plan-toggle .switch::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .plan-toggle .switch.on::after{left:18px}
+  .auto-tag{font-size:10px;color:#fff;background:#8b5cf6;padding:1px 5px;border-radius:3px;margin-left:4px}
+  /* 星期/日期多选 */
+  .day-picker{display:flex;flex-wrap:wrap;gap:8px}
+  .day-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:2px solid var(--border);border-radius:20px;font-size:13px;cursor:pointer;user-select:none;transition:all .15s;background:#fff}
+  .day-chip input{display:none}
+  .day-chip:has(input:checked){border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600}
+  .day-chip.checked{border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600}
+  /* 底部浮动记账按钮 */
+  .fab{position:fixed;right:24px;bottom:max(24px,env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 12px rgba(79,70,229,.4);z-index:50;display:flex;align-items:center;justify-content:center}
+  /* toast */
+  .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:200;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media(max-width:480px){
+    .category-grid{grid-template-columns:repeat(4,1fr)}
+    .stat-card.total .value{font-size:24px}
+  }
+</style>
+  
+  
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="日常记账">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📒</text></svg>">
 </head>
 <body>
-  <div id="root"></div>
+<div class="app">
+  <div class="header">
+    <h1>📒 日常记账</h1>
+    <div class="sub" id="todayStr"></div>
+  </div>
+
+  <!-- 概览卡片 -->
+  <div class="stat-grid">
+    <div class="stat-card total">
+      <div class="label">总资产</div>
+      <div class="value" id="totalAsset">¥0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">本月支出</div>
+      <div class="value expense" id="monthExpense">¥0.00</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">本月收入</div>
+      <div class="value income" id="monthIncome">¥0.00</div>
+    </div>
+  </div>
+
+  <!-- Tab 导航 -->
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">概览</button>
+    <button class="tab" data-tab="accounts">账户</button>
+    <button class="tab" data-tab="add">记账</button>
+    <button class="tab" data-tab="records">记录</button>
+    <button class="tab" data-tab="plans">定投</button>
+    <button class="tab" data-tab="stats">统计</button>
+  </div>
+
+  <!-- 概览页 -->
+  <div class="page" id="page-overview">
+    <div class="section-title">账户总览<span class="right" id="accountCount">0 个账户</span></div>
+    <div id="overviewAccounts"></div>
+    <div class="section-title" style="margin-top:20px">最近记录<span class="right">最近10笔</span></div>
+    <div id="recentRecords"></div>
+  </div>
+
+  <!-- 账户页 -->
+  <div class="page" id="page-accounts" style="display:none">
+    <div class="form-card">
+      <div class="section-title">添加账户</div>
+      <div class="form-row">
+        <label>账户名称</label>
+        <input type="text" id="accName" placeholder="如：微信钱包、招商卡">
+      </div>
+      <div class="form-row">
+        <label>账户类型</label>
+        <select id="accType">
+          <option value="现金">💰 现金</option>
+          <option value="银行卡">🏦 银行卡</option>
+          <option value="电子钱包">📱 电子钱包</option>
+          <option value="储蓄卡">💳 储蓄卡</option>
+          <option value="其他">📦 其他</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>初始余额</label>
+        <input type="number" id="accBalance" placeholder="0.00" step="0.01" value="0" inputmode="decimal">
+      </div>
+      <div class="form-row">
+        <label>备注（可选）</label>
+        <input type="text" id="accNote" placeholder="如：日常零花">
+      </div>
+      <button class="btn" onclick="addAccount()">添加账户</button>
+    </div>
+    <div class="section-title">我的账户</div>
+    <div id="accountList"></div>
+  </div>
+
+  <!-- 记账页 -->
+  <div class="page" id="page-add" style="display:none">
+    <div class="form-card">
+      <div class="type-switch">
+        <button class="type-btn expense active" id="btnExpense" onclick="switchType('expense')">➖ 支出</button>
+        <button class="type-btn income" id="btnIncome" onclick="switchType('income')">➕ 收入</button>
+      </div>
+      <div class="form-row">
+        <label>金额</label>
+        <input type="number" id="amount" placeholder="0.00" step="0.01" autofocus inputmode="decimal">
+      </div>
+      <div class="form-row">
+        <label>选择账户</label>
+        <select id="recordAccount"></select>
+      </div>
+      <div class="form-row">
+        <label>分类</label>
+        <div class="category-grid" id="categoryGrid"></div>
+      </div>
+      <div class="form-row">
+        <label>日期</label>
+        <input type="date" id="recordDate">
+      </div>
+      <div class="form-row">
+        <label>备注（可选）</label>
+        <input type="text" id="recordNote" placeholder="如：午餐、地铁">
+      </div>
+      <button class="btn" id="submitBtn" onclick="addRecord()">确认记账</button>
+    </div>
+  </div>
+
+  <!-- 记录页 -->
+  <div class="page" id="page-records" style="display:none">
+    <div class="filter-bar">
+      <select id="filterType" onchange="renderRecords()">
+        <option value="">全部类型</option>
+        <option value="expense">支出</option>
+        <option value="income">收入</option>
+      </select>
+      <select id="filterAccount" onchange="renderRecords()"></select>
+      <select id="filterMonth" onchange="renderRecords()"></select>
+    </div>
+    <div id="recordList"></div>
+  </div>
+
+  <!-- 定投计划页 -->
+  <div class="page" id="page-plans" style="display:none">
+    <div class="form-card">
+      <div class="section-title">添加定投计划</div>
+      <div class="type-switch">
+        <button class="type-btn expense active" id="planBtnExpense" onclick="switchPlanType('expense')">➖ 定投支出</button>
+        <button class="type-btn income" id="planBtnIncome" onclick="switchPlanType('income')">➕ 定投收入</button>
+      </div>
+      <div class="form-row">
+        <label>计划名称</label>
+        <input type="text" id="planName" placeholder="如：沪深300日定投">
+      </div>
+      <div class="form-row">
+        <label>每期金额</label>
+        <input type="number" id="planAmount" placeholder="0.00" step="0.01" inputmode="decimal">
+      </div>
+      <div class="form-row">
+        <label>选择账户</label>
+        <select id="planAccount"></select>
+      </div>
+      <div class="form-row">
+        <label>频率</label>
+        <select id="planFreq" onchange="togglePlanFreqOptions()">
+          <option value="daily">📅 每天</option>
+          <option value="weekdays">💼 工作日（周一至周五）</option>
+          <option value="weekends">🎉 周末（周六、周日）</option>
+          <option value="weekly">📆 每周</option>
+          <option value="customDays">☑️ 自选星期（多选）</option>
+          <option value="interval">🔁 每隔N天</option>
+          <option value="monthly">🗓️ 每月</option>
+          <option value="monthlyMulti">📅 每月多日（多选）</option>
+        </select>
+      </div>
+      <div class="form-row" id="weeklyRow" style="display:none">
+        <label>每周几执行</label>
+        <select id="planWeeklyDay">
+          <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option>
+          <option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="0">周日</option>
+        </select>
+      </div>
+      <div class="form-row" id="customDaysRow" style="display:none">
+        <label>选择星期（可多选）</label>
+        <div class="day-picker" id="planCustomDays">
+          <label class="day-chip"><input type="checkbox" value="1">周一</label>
+          <label class="day-chip"><input type="checkbox" value="2">周二</label>
+          <label class="day-chip"><input type="checkbox" value="3">周三</label>
+          <label class="day-chip"><input type="checkbox" value="4">周四</label>
+          <label class="day-chip"><input type="checkbox" value="5">周五</label>
+          <label class="day-chip"><input type="checkbox" value="6">周六</label>
+          <label class="day-chip"><input type="checkbox" value="0">周日</label>
+        </div>
+      </div>
+      <div class="form-row" id="intervalRow" style="display:none">
+        <label>每隔几天执行一次</label>
+        <input type="number" id="planInterval" placeholder="如：3 表示每3天" min="2" max="365" value="3" inputmode="numeric">
+      </div>
+      <div class="form-row" id="monthlyRow" style="display:none">
+        <label>每月几号执行</label>
+        <select id="planMonthlyDay"></select>
+      </div>
+      <div class="form-row" id="monthlyMultiRow" style="display:none">
+        <label>选择每月几号执行（可多选）</label>
+        <div class="day-picker" id="planMonthlyMulti">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>分类</label>
+        <select id="planCategory"></select>
+      </div>
+      <div class="form-row">
+        <label>起始日期</label>
+        <input type="date" id="planStartDate">
+      </div>
+      <div class="form-row">
+        <label>备注（可选）</label>
+        <input type="text" id="planNote" placeholder="如：指数基金定投">
+      </div>
+      <button class="btn" onclick="addPlan()">创建定投计划</button>
+    </div>
+    <div class="section-title">我的定投计划<span class="right" id="planCount">0 个计划</span></div>
+    <div id="planList"></div>
+    <div class="chart-card" style="margin-top:16px">
+      <p style="font-size:13px;color:var(--text2);line-height:1.7">
+        💡 <b>自动补记机制</b>：每次打开应用时，系统会检查所有启用的定投计划，
+        自动补上从起始日到今天该记但未记的记录。每天打开记账就会自动把当天定投记上。
+      </p>
+    </div>
+  </div>
+
+  <!-- 统计页 -->
+  <div class="page" id="page-stats" style="display:none">
+    <div class="chart-card">
+      <h3>📊 支出分类占比（本月）</h3>
+      <div id="expenseChart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>📈 收入分类占比（本月）</h3>
+      <div id="incomeChart"></div>
+    </div>
+    <div class="chart-card">
+      <h3>📅 近6月收支趋势</h3>
+      <div class="month-trend" id="monthTrend"></div>
+    </div>
+    <div class="chart-card">
+      <h3>💾 数据管理</h3>
+      <button class="btn secondary" onclick="exportData()" style="margin-bottom:8px">导出备份（JSON）</button>
+      <button class="btn secondary" onclick="document.getElementById('importFile').click()">导入备份</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <p style="font-size:12px;color:var(--text2);margin-top:10px;line-height:1.6">数据自动保存在本地浏览器，建议定期导出备份以防丢失。清除浏览器数据会导致记账数据丢失。</p>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑账户弹窗 -->
+<div class="modal-mask" id="editAccModal" onclick="if(event.target===this)closeModal('editAccModal')">
+  <div class="modal">
+    <h3>编辑账户</h3>
+    <input type="hidden" id="editAccId">
+    <div class="form-row"><label>账户名称</label><input type="text" id="editAccName"></div>
+    <div class="form-row"><label>账户类型</label>
+      <select id="editAccType">
+        <option value="现金">💰 现金</option>
+        <option value="银行卡">🏦 银行卡</option>
+        <option value="电子钱包">📱 电子钱包</option>
+        <option value="储蓄卡">💳 储蓄卡</option>
+        <option value="其他">📦 其他</option>
+      </select>
+    </div>
+    <div class="form-row"><label>初始余额</label><input type="number" id="editAccBalance" step="0.01" inputmode="decimal"></div>
+    <div class="form-row"><label>备注</label><input type="text" id="editAccNote"></div>
+    <button class="btn" onclick="saveEditAccount()">保存修改</button>
+    <button class="btn secondary" onclick="closeModal('editAccModal')" style="margin-top:8px">取消</button>
+  </div>
+</div>
+
+<!-- 浮动记账按钮 -->
+<button class="fab" onclick="goTab('add')" title="快速记账">＋</button>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 数据层 ============ */
+const LS_KEY = 'bookkeeping_data_v1';
+let state = {accounts:[], records:[], plans:[], currentType:'expense', currentCategory:''};
+
+function loadData(){
+  try{ state = Object.assign(state, JSON.parse(localStorage.getItem(LS_KEY)||'{}')); }catch(e){}
+  if(!state.accounts) state.accounts=[];
+  if(!state.records) state.records=[];
+  if(!state.plans) state.plans=[];
+}
+function saveData(){ localStorage.setItem(LS_KEY, JSON.stringify({accounts:state.accounts,records:state.records,plans:state.plans})); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ============ 分类配置 ============ */
+const CATEGORIES = {
+  expense:[
+    {name:'餐饮',icon:'🍜'},{name:'交通',icon:'🚇'},{name:'购物',icon:'🛍️'},{name:'娱乐',icon:'🎮'},
+    {name:'医疗',icon:'💊'},{name:'住房',icon:'🏠'},{name:'教育',icon:'📚'},{name:'日用',icon:'🧴'},
+    {name:'通讯',icon:'📱'},{name:'人情',icon:'🎁'},{name:'服饰',icon:'👕'},{name:'其他',icon:'✏️'}
+  ],
+  income:[
+    {name:'工资',icon:'💼'},{name:'奖金',icon:'🎉'},{name:'转账',icon:'🔄'},{name:'投资',icon:'📈'},
+    {name:'红包',icon:'🧧'},{name:'兼职',icon:'🛠️'},{name:'退款',icon:'↩️'},{name:'其他',icon:'✏️'}
+  ]
+};
+
+/* ============ 工具函数 ============ */
+function fmt(n){ return '¥'+Number(n||0).toFixed(2); }
+function accIcon(type){
+  const m={'现金':'💰','银行卡':'🏦','电子钱包':'📱','储蓄卡':'💳','其他':'📦'};
+  return m[type]||'📦';
+}
+function todayStr(){
+  const d=new Date();
+  const w=['日','一','二','三','四','五','六'][d.getDay()];
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 · 星期${w}`;
+}
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+
+/* ============ 账户余额计算 ============ */
+function accountBalance(accId){
+  const acc = state.accounts.find(a=>a.id===accId);
+  if(!acc) return 0;
+  let bal = Number(acc.initialBalance||0);
+  state.records.forEach(r=>{
+    if(r.accountId===accId){
+      if(r.type==='income') bal += Number(r.amount);
+      else bal -= Number(r.amount);
+    }
+  });
+  return bal;
+}
+function totalAsset(){ return state.accounts.reduce((s,a)=>s+accountBalance(a.id),0); }
+function monthSum(type){
+  const ym = new Date().toISOString().slice(0,7);
+  return state.records.filter(r=>r.type===type && r.date.startsWith(ym)).reduce((s,r)=>s+Number(r.amount),0);
+}
+
+/* ============ Tab 切换 ============ */
+function goTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  document.getElementById('page-'+name).style.display='';
+  if(name==='add') document.getElementById('recordDate').value=todayISO();
+  if(name==='records') renderRecords();
+  if(name==='plans'){ renderPlanAccountSelect(); renderPlans(); }
+  if(name==='stats') renderStats();
+  if(name==='overview') renderOverview();
+  if(name==='accounts') renderAccounts();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>goTab(t.dataset.tab));
+
+/* ============ 概览 ============ */
+function renderOverview(){
+  document.getElementById('totalAsset').textContent = fmt(totalAsset());
+  document.getElementById('monthExpense').textContent = fmt(monthSum('expense'));
+  document.getElementById('monthIncome').textContent = fmt(monthSum('income'));
+  document.getElementById('accountCount').textContent = state.accounts.length+' 个账户';
+  // 账户概览
+  const box=document.getElementById('overviewAccounts');
+  if(state.accounts.length===0){ box.innerHTML='<div class="empty">还没有账户，去「账户」页添加</div>'; }
+  else{
+    box.innerHTML = state.accounts.map(a=>{
+      const bal=accountBalance(a.id);
+      return `<div class="account-card"><div class="left"><div class="account-icon">${accIcon(a.type)}</div><div class="account-info"><div class="name">${esc(a.name)}</div><div class="meta">${esc(a.type)}${a.note?' · '+esc(a.note):''}</div></div></div><div class="account-balance">${fmt(bal)}</div></div>`;
+    }).join('');
+  }
+  // 最近记录
+  const rbox=document.getElementById('recentRecords');
+  const recs=[...state.records].sort((a,b)=>(b.date+b.createdAt||'').localeCompare(a.date+a.createdAt||'')).slice(0,10);
+  if(recs.length===0){ rbox.innerHTML='<div class="empty">还没有记录，点右下角 ＋ 开始记账</div>'; }
+  else{ rbox.innerHTML = recs.map(r=>recordItemHTML(r)).join(''); }
+}
+
+/* ============ 账户管理 ============ */
+function renderAccountSelect(){
+  const sel=document.getElementById('recordAccount');
+  const fsel=document.getElementById('filterAccount');
+  const opts = state.accounts.length===0
+    ? '<option value="">请先添加账户</option>'
+    : state.accounts.map(a=>`<option value="${a.id}">${esc(a.name)} (${esc(a.type)})</option>`).join('');
+  sel.innerHTML=opts;
+  fsel.innerHTML='<option value="">全部账户</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+}
+function renderAccounts(){
+  const box=document.getElementById('accountList');
+  if(state.accounts.length===0){ box.innerHTML='<div class="empty">暂无账户，在上方添加</div>'; return; }
+  box.innerHTML = state.accounts.map(a=>{
+    const bal=accountBalance(a.id);
+    return `<div class="account-card"><div class="left"><div class="account-icon">${accIcon(a.type)}</div><div class="account-info"><div class="name">${esc(a.name)}</div><div class="meta">${esc(a.type)} · 初始${fmt(a.initialBalance)}${a.note?' · '+esc(a.note):''}</div><div class="account-actions"><button onclick="openEditAccount('${a.id}')">编辑</button><button onclick="deleteAccount('${a.id}')">删除</button></div></div></div><div class="account-balance">${fmt(bal)}<div class="small">当前余额</div></div></div>`;
+  }).join('');
+}
+function addAccount(){
+  const name=document.getElementById('accName').value.trim();
+  if(!name){ toast('请输入账户名称'); return; }
+  state.accounts.push({id:uid(),name,type:document.getElementById('accType').value,initialBalance:Number(document.getElementById('accBalance').value)||0,note:document.getElementById('accNote').value.trim(),createdAt:Date.now()});
+  saveData();
+  document.getElementById('accName').value=''; document.getElementById('accBalance').value='0'; document.getElementById('accNote').value='';
+  renderAccountSelect(); renderAccounts(); renderOverview();
+  toast('账户已添加');
+}
+function openEditAccount(id){
+  const a=state.accounts.find(x=>x.id===id); if(!a) return;
+  document.getElementById('editAccId').value=a.id;
+  document.getElementById('editAccName').value=a.name;
+  document.getElementById('editAccType').value=a.type;
+  document.getElementById('editAccBalance').value=a.initialBalance;
+  document.getElementById('editAccNote').value=a.note||'';
+  document.getElementById('editAccModal').classList.add('show');
+}
+function saveEditAccount(){
+  const id=document.getElementById('editAccId').value;
+  const a=state.accounts.find(x=>x.id===id); if(!a) return;
+  const name=document.getElementById('editAccName').value.trim();
+  if(!name){ toast('请输入账户名称'); return; }
+  a.name=name; a.type=document.getElementById('editAccType').value;
+  a.initialBalance=Number(document.getElementById('editAccBalance').value)||0;
+  a.note=document.getElementById('editAccNote').value.trim();
+  saveData(); closeModal('editAccModal');
+  renderAccountSelect(); renderAccounts(); renderOverview();
+  toast('已保存');
+}
+function deleteAccount(id){
+  const a=state.accounts.find(x=>x.id===id);
+  const cnt=state.records.filter(r=>r.accountId===id).length;
+  if(!confirm(`确定删除账户「${a.name}」？${cnt>0?`该账户下有 ${cnt} 条记录，将一并删除。`:''}`)) return;
+  state.accounts=state.accounts.filter(x=>x.id!==id);
+  state.records=state.records.filter(r=>r.accountId!==id);
+  saveData(); renderAccountSelect(); renderAccounts(); renderOverview();
+  toast('已删除');
+}
+
+/* ============ 记账 ============ */
+function switchType(type){
+  state.currentType=type; state.currentCategory='';
+  document.getElementById('btnExpense').classList.toggle('active', type==='expense');
+  document.getElementById('btnIncome').classList.toggle('active', type==='income');
+  renderCategoryGrid();
+  document.getElementById('submitBtn').textContent = type==='expense'?'确认记支出':'确认记收入';
+}
+function renderCategoryGrid(){
+  const grid=document.getElementById('categoryGrid');
+  grid.innerHTML = CATEGORIES[state.currentType].map((c,i)=>{
+    return `<div class="cat-item ${state.currentCategory===c.name?'active':''}" onclick="selectCat('${c.name}')"><span class="ico">${c.icon}</span>${c.name}</div>`;
+  }).join('');
+}
+function selectCat(name){ state.currentCategory=name; renderCategoryGrid(); }
+function addRecord(){
+  const amount=Number(document.getElementById('amount').value);
+  if(!amount||amount<=0){ toast('请输入金额'); return; }
+  const accountId=document.getElementById('recordAccount').value;
+  if(!accountId){ toast('请先添加账户'); return; }
+  if(!state.currentCategory){ toast('请选择分类'); return; }
+  const rec={id:uid(),type:state.currentType,amount,accountId,category:state.currentCategory,note:document.getElementById('recordNote').value.trim(),date:document.getElementById('recordDate').value||todayISO(),createdAt:Date.now()};
+  state.records.push(rec); saveData();
+  document.getElementById('amount').value=''; document.getElementById('recordNote').value='';
+  state.currentCategory=''; renderCategoryGrid();
+  renderOverview();
+  toast(state.currentType==='expense'?'支出已记录':'收入已记录');
+}
+
+/* ============ 记录列表 ============ */
+function recordItemHTML(r){
+  const acc=state.accounts.find(a=>a.id===r.accountId);
+  const cat=CATEGORIES[r.type].find(c=>c.name===r.category)||{icon:'✏️'};
+  return `<div class="record-item"><div class="rc-left"><div class="rc-icon ${r.type}">${cat.icon}</div><div class="rc-info"><div class="top"><span class="cat">${esc(r.category)}</span>${r.auto?'<span class="auto-tag">自动</span>':''}${acc?`<span class="acct">${esc(acc.name)}</span>`:''}</div><div class="note">${esc(r.note||'无备注')}</div></div></div><div class="rc-right"><div class="rc-amount ${r.type}">${r.type==='expense'?'-':'+'}${fmt(r.amount)}</div><div class="rc-date">${r.date}</div><button class="rc-del" onclick="deleteRecord('${r.id}')">删除</button></div></div>`;
+}
+function renderRecords(){
+  const ft=document.getElementById('filterType').value;
+  const fa=document.getElementById('filterAccount').value;
+  const fm=document.getElementById('filterMonth').value;
+  let list=[...state.records].filter(r=>{
+    if(ft && r.type!==ft) return false;
+    if(fa && r.accountId!==fa) return false;
+    if(fm && !r.date.startsWith(fm)) return false;
+    return true;
+  }).sort((a,b)=>(b.date+''+b.createdAt).localeCompare(a.date+''+a.createdAt));
+  const box=document.getElementById('recordList');
+  if(list.length===0){ box.innerHTML='<div class="empty">没有符合条件的记录</div>'; return; }
+  box.innerHTML=list.map(r=>recordItemHTML(r)).join('');
+}
+function deleteRecord(id){
+  if(!confirm('删除这条记录？')) return;
+  state.records=state.records.filter(r=>r.id!==id); saveData();
+  renderRecords(); renderOverview();
+  toast('已删除');
+}
+function renderMonthFilter(){
+  const months=[...new Set(state.records.map(r=>r.date.slice(0,7)))].sort().reverse();
+  document.getElementById('filterMonth').innerHTML='<option value="">全部月份</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+
+/* ============ 定投计划 ============ */
+let planType = 'expense';
+
+function switchPlanType(type){
+  planType = type;
+  document.getElementById('planBtnExpense').classList.toggle('active', type==='expense');
+  document.getElementById('planBtnIncome').classList.toggle('active', type==='income');
+  renderPlanCategorySelect();
+}
+function togglePlanFreqOptions(){
+  const freq = document.getElementById('planFreq').value;
+  document.getElementById('weeklyRow').style.display = freq==='weekly' ? '' : 'none';
+  document.getElementById('customDaysRow').style.display = freq==='customDays' ? '' : 'none';
+  document.getElementById('intervalRow').style.display = freq==='interval' ? '' : 'none';
+  document.getElementById('monthlyRow').style.display = freq==='monthly' ? '' : 'none';
+  document.getElementById('monthlyMultiRow').style.display = freq==='monthlyMulti' ? '' : 'none';
+}
+function renderPlanAccountSelect(){
+  const sel = document.getElementById('planAccount');
+  const opts = state.accounts.length===0
+    ? '<option value="">请先添加账户</option>'
+    : state.accounts.map(a=>`<option value="${a.id}">${esc(a.name)} (${esc(a.type)})</option>`).join('');
+  sel.innerHTML = opts;
+}
+function renderPlanCategorySelect(){
+  const sel = document.getElementById('planCategory');
+  sel.innerHTML = CATEGORIES[planType].map(c=>`<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');
+  // 初始化每月几号下拉(1-31)
+  const md = document.getElementById('planMonthlyDay');
+  if(md.children.length===0){
+    let html='';
+    for(let i=1;i<=31;i++) html+=`<option value="${i}">${i}号</option>`;
+    md.innerHTML=html;
+  }
+  // 初始化每月多日选择器(1-31)
+  const mm = document.getElementById('planMonthlyMulti');
+  if(mm.children.length===0){
+    let html='';
+    for(let i=1;i<=31;i++) html+=`<label class="day-chip"><input type="checkbox" value="${i}">${i}号</label>`;
+    mm.innerHTML=html;
+  }
+}
+function isoDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function shouldExecute(plan, date){
+  const dow = date.getDay(); // 0=周日, 1-6=周一到周六
+  if(plan.frequency==='daily') return true;
+  if(plan.frequency==='weekdays') return dow>=1 && dow<=5;
+  if(plan.frequency==='weekends') return dow===0 || dow===6;
+  if(plan.frequency==='weekly') return dow===Number(plan.weeklyDay);
+  if(plan.frequency==='customDays') return (plan.customDays||[]).map(Number).includes(dow);
+  if(plan.frequency==='interval'){
+    const start = new Date((plan.startDate||todayISO())+'T00:00:00');
+    const diff = Math.floor((date - start) / 86400000);
+    return diff >= 0 && diff % Number(plan.interval||1) === 0;
+  }
+  if(plan.frequency==='monthly') return date.getDate()===Number(plan.monthlyDay);
+  if(plan.frequency==='monthlyMulti') return (plan.monthlyMultiDays||[]).map(Number).includes(date.getDate());
+  return false;
+}
+function getPlanDates(plan, today){
+  const start = plan.startDate || today;
+  const dates = [];
+  const startD = new Date(start+'T00:00:00');
+  const todayD = new Date(today+'T00:00:00');
+  for(let d=new Date(startD); d<=todayD; d.setDate(d.getDate()+1)){
+    if(shouldExecute(plan, d)) dates.push(isoDate(d));
+  }
+  return dates;
+}
+function autoExecutePlans(){
+  const today = todayISO();
+  let newRecords = [];
+  state.plans.forEach(plan=>{
+    if(!plan.enabled) return;
+    if(!plan.accountId) return;
+    const dates = getPlanDates(plan, today);
+    dates.forEach(date=>{
+      const exists = state.records.some(r=>r.planId===plan.id && r.date===date);
+      if(!exists){
+        newRecords.push({
+          id: uid(), type: plan.type, amount: plan.amount, accountId: plan.accountId,
+          category: plan.category, note: plan.note || plan.name, date: date,
+          planId: plan.id, auto: true, createdAt: Date.now()
+        });
+      }
+    });
+  });
+  if(newRecords.length>0){
+    state.records.push(...newRecords);
+    saveData();
+    toast('🔄 自动补记 '+newRecords.length+' 笔定投');
+  }
+}
+function freqLabel(plan){
+  const dayNames = ['日','一','二','三','四','五','六'];
+  if(plan.frequency==='daily') return '每天';
+  if(plan.frequency==='weekdays') return '工作日';
+  if(plan.frequency==='weekends') return '周末';
+  if(plan.frequency==='weekly') return '每周'+dayNames[plan.weeklyDay];
+  if(plan.frequency==='customDays'){
+    const days = (plan.customDays||[]).map(Number).sort();
+    if(days.length===0) return '自选(未选)';
+    return '每'+days.map(d=>dayNames[d]).join('、');
+  }
+  if(plan.frequency==='interval') return '每隔'+(plan.interval||1)+'天';
+  if(plan.frequency==='monthly') return '每月'+plan.monthlyDay+'号';
+  if(plan.frequency==='monthlyMulti'){
+    const days = (plan.monthlyMultiDays||[]).map(Number).sort((a,b)=>a-b);
+    if(days.length===0) return '每月(未选)';
+    return '每月'+days.join('、')+'号';
+  }
+  return '';
+}
+function renderPlans(){
+  document.getElementById('planCount').textContent = state.plans.length+' 个计划';
+  const box = document.getElementById('planList');
+  if(state.plans.length===0){ box.innerHTML='<div class="empty">暂无定投计划，在上方创建</div>'; return; }
+  box.innerHTML = state.plans.map(p=>{
+    const acc = state.accounts.find(a=>a.id===p.accountId);
+    const cat = CATEGORIES[p.type].find(c=>c.name===p.category) || {icon:'✏️'};
+    const nextDate = getNextExecDate(p);
+    return `<div class="plan-card">
+      <div class="plan-top">
+        <div class="plan-left">
+          <div class="plan-icon">${cat.icon}</div>
+          <div class="plan-info">
+            <div class="name">${esc(p.name)}${p.enabled?'':'（已暂停）'}</div>
+            <div class="meta">${freqLabel(p)} · ${acc?esc(acc.name):'无账户'} · 起${p.startDate}</div>
+          </div>
+        </div>
+        <div class="plan-amount">${p.type==='expense'?'-':'+'}${fmt(p.amount)}<div class="small">下次: ${nextDate||'—'}</div></div>
+      </div>
+      <div class="plan-actions">
+        <span class="plan-toggle">启用 <span class="switch ${p.enabled?'on':''}" onclick="togglePlan('${p.id}')"></span></span>
+        <button onclick="manualExecPlan('${p.id}')">立即补记</button>
+        <button onclick="deletePlan('${p.id}')">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function getNextExecDate(plan){
+  if(!plan.enabled) return null;
+  const today = new Date(todayISO()+'T00:00:00');
+  for(let d=new Date(today); ; d.setDate(d.getDate()+1)){
+    if(shouldExecute(plan, d)) return isoDate(d);
+    if(d > new Date(today.getFullYear()+1, today.getMonth(), today.getDate())) break;
+  }
+  return null;
+}
+function addPlan(){
+  const name = document.getElementById('planName').value.trim();
+  if(!name){ toast('请输入计划名称'); return; }
+  const amount = Number(document.getElementById('planAmount').value);
+  if(!amount||amount<=0){ toast('请输入金额'); return; }
+  const accountId = document.getElementById('planAccount').value;
+  if(!accountId){ toast('请先添加账户'); return; }
+  const freq = document.getElementById('planFreq').value;
+
+  // 收集频率相关数据
+  let customDays = [], interval = 1, monthlyMultiDays = [];
+  if(freq==='customDays'){
+    customDays = [...document.querySelectorAll('#planCustomDays input:checked')].map(c=>c.value);
+    if(customDays.length===0){ toast('请至少选择一个星期'); return; }
+  }
+  if(freq==='interval'){
+    interval = Number(document.getElementById('planInterval').value);
+    if(!interval||interval<2){ toast('间隔天数至少为2'); return; }
+  }
+  if(freq==='monthlyMulti'){
+    monthlyMultiDays = [...document.querySelectorAll('#planMonthlyMulti input:checked')].map(c=>c.value);
+    if(monthlyMultiDays.length===0){ toast('请至少选择一个日期'); return; }
+  }
+
+  const plan = {
+    id: uid(), name, amount, type: planType, frequency: freq,
+    weeklyDay: document.getElementById('planWeeklyDay').value,
+    monthlyDay: document.getElementById('planMonthlyDay').value,
+    customDays, interval, monthlyMultiDays,
+    accountId, category: document.getElementById('planCategory').value,
+    note: document.getElementById('planNote').value.trim(),
+    startDate: document.getElementById('planStartDate').value || todayISO(),
+    enabled: true, createdAt: Date.now()
+  };
+  state.plans.push(plan);
+  saveData();
+  document.getElementById('planName').value=''; document.getElementById('planAmount').value=''; document.getElementById('planNote').value='';
+  // 重置多选
+  document.querySelectorAll('#planCustomDays input, #planMonthlyMulti input').forEach(c=>c.checked=false);
+  autoExecutePlans(); renderPlans(); renderOverview();
+  toast('定投计划已创建');
+}
+function togglePlan(id){
+  const p = state.plans.find(x=>x.id===id); if(!p) return;
+  p.enabled = !p.enabled; saveData(); renderPlans();
+  toast(p.enabled?'已启用':'已暂停');
+}
+function manualExecPlan(id){
+  const p = state.plans.find(x=>x.id===id); if(!p) return;
+  const dates = getPlanDates(p, todayISO());
+  let cnt = 0;
+  dates.forEach(date=>{
+    const exists = state.records.some(r=>r.planId===p.id && r.date===date);
+    if(!exists){
+      state.records.push({id:uid(),type:p.type,amount:p.amount,accountId:p.accountId,category:p.category,note:p.note||p.name,date:date,planId:p.id,auto:true,createdAt:Date.now()});
+      cnt++;
+    }
+  });
+  saveData(); renderPlans(); renderOverview();
+  toast(cnt>0?`已补记 ${cnt} 笔`:'没有需要补记的');
+}
+function deletePlan(id){
+  const p = state.plans.find(x=>x.id===id); if(!p) return;
+  const autoCnt = state.records.filter(r=>r.planId===id).length;
+  if(!confirm(`删除定投计划「${p.name}」？${autoCnt>0?`已有 ${autoCnt} 笔自动记录（仅删除计划，已记的账保留）。`:''}`)) return;
+  state.plans = state.plans.filter(x=>x.id!==id);
+  saveData(); renderPlans(); renderOverview();
+  toast('已删除');
+}
+
+/* ============ 统计 ============ */
+function renderStats(){
+  const ym=new Date().toISOString().slice(0,7);
+  // 支出分类
+  const expByCat={};
+  state.records.filter(r=>r.type==='expense'&&r.date.startsWith(ym)).forEach(r=>{expByCat[r.category]=(expByCat[r.category]||0)+Number(r.amount);});
+  const totalExp=Object.values(expByCat).reduce((s,v)=>s+v,0);
+  document.getElementById('expenseChart').innerHTML = barChartHTML(expByCat,totalExp,CATEGORIES.expense);
+  // 收入分类
+  const incByCat={};
+  state.records.filter(r=>r.type==='income'&&r.date.startsWith(ym)).forEach(r=>{incByCat[r.category]=(incByCat[r.category]||0)+Number(r.amount);});
+  const totalInc=Object.values(incByCat).reduce((s,v)=>s+v,0);
+  document.getElementById('incomeChart').innerHTML = barChartHTML(incByCat,totalInc,CATEGORIES.income);
+  // 月度趋势
+  renderMonthTrend();
+}
+function barChartHTML(data,total,cats){
+  const entries=Object.entries(data).sort((a,b)=>b[1]-a[1]);
+  if(entries.length===0) return '<div class="empty">本月暂无数据</div>';
+  const max=Math.max(...entries.map(e=>e[1]));
+  return entries.map(([cat,val])=>{
+    const c=cats.find(x=>x.name===cat)||{icon:'✏️'};
+    const pct=total>0?(val/total*100).toFixed(1):0;
+    const w=Math.max(8,val/max*100);
+    return `<div class="bar-row"><div class="bar-label">${c.icon} ${cat}</div><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${cat==='其他'?'#94a3b8':'#4f46e5'}">${pct}%</div></div><div class="bar-amount">${fmt(val)}</div></div>`;
+  }).join('');
+}
+function renderMonthTrend(){
+  const box=document.getElementById('monthTrend');
+  const now=new Date();
+  const months=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    months.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  }
+  const data=months.map(ym=>{
+    const exp=state.records.filter(r=>r.type==='expense'&&r.date.startsWith(ym)).reduce((s,r)=>s+Number(r.amount),0);
+    const inc=state.records.filter(r=>r.type==='income'&&r.date.startsWith(ym)).reduce((s,r)=>s+Number(r.amount),0);
+    return {ym,exp,inc};
+  });
+  const maxVal=Math.max(...data.map(d=>Math.max(d.exp,d.inc)),1);
+  box.innerHTML=data.map(d=>{
+    const eh=d.exp/maxVal*100, ih=d.inc/maxVal*100;
+    return `<div class="month-col"><div style="display:flex;gap:2px;align-items:flex-end;width:100%;justify-content:center;height:90px">
+      <div class="month-bar expense" style="height:${eh}%" title="支出${fmt(d.exp)}"></div>
+      <div class="month-bar income" style="height:${ih}%" title="收入${fmt(d.inc)}"></div>
+    </div><div class="month-label">${d.ym.slice(5)}月</div></div>`;
+  }).join('');
+}
+
+/* ============ 数据导入导出 ============ */
+function exportData(){
+  const data=JSON.stringify({accounts:state.accounts,records:state.records,plans:state.plans,exportAt:new Date().toISOString()},null,2);
+  const blob=new Blob([data],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='记账备份_'+todayISO()+'.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('已导出备份');
+}
+function importData(e){
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data.accounts||!data.records) throw new Error('格式错误');
+      if(!confirm(`将导入 ${data.accounts.length} 个账户、${data.records.length} 条记录${data.plans?('、'+data.plans.length+' 个计划'):''}，会覆盖当前数据，继续？`)) return;
+      state.accounts=data.accounts; state.records=data.records; state.plans=data.plans||[];
+      saveData(); renderAll(); autoExecutePlans();
+      toast('导入成功');
+    }catch(err){ toast('文件格式错误'); }
+  };
+  reader.readAsText(file);
+  e.target.value='';
+}
+
+/* ============ 工具 ============ */
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function renderAll(){ renderAccountSelect(); renderPlanAccountSelect(); renderOverview(); renderAccounts(); renderRecords(); renderPlans(); renderStats(); renderMonthFilter(); }
+
+/* ============ 初始化 ============ */
+loadData();
+document.getElementById('todayStr').textContent=todayStr();
+document.getElementById('recordDate').value=todayISO();
+document.getElementById('planStartDate').value=todayISO();
+renderCategoryGrid();
+renderPlanCategorySelect();
+renderAccountSelect();
+renderPlanAccountSelect();
+renderOverview();
+renderMonthFilter();
+// iOS :has() 兜底：多选标签点击时加 checked class
+document.querySelectorAll('.day-picker').forEach(picker=>{
+  picker.addEventListener('change',e=>{
+    if(e.target.type==='checkbox'){
+      e.target.closest('.day-chip').classList.toggle('checked', e.target.checked);
+    }
+  });
+});
+// 打开应用时自动补记定投
+autoExecutePlans();
+renderPlans();
+// 首次使用引导
+if(state.accounts.length===0){
+  // 预置示例账户
+  state.accounts=[
+    {id:uid(),name:'微信钱包',type:'电子钱包',initialBalance:500,note:'日常零花',createdAt:Date.now()},
+    {id:uid(),name:'招商卡',type:'银行卡',initialBalance:10000,note:'主储蓄',createdAt:Date.now()+1}
+  ];
+  saveData(); renderAccountSelect(); renderOverview();
+}
+</script>
 </body>
 </html>
